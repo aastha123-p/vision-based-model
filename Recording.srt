@@ -1,0 +1,8 @@
+1
+00:00:00,000 --> 00:00:09,000
+Hello, this is Saurabh. Nice to meet you.
+
+2
+00:00:17,000 --> 00:00:21,000
+Okay, I am also fine with talking in Hindi.
+
