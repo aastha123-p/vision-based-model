@@ -7,7 +7,6 @@ import cv2
 import numpy as np
 from typing import Dict, Optional, List, Tuple
 import time
-
 from app.vision.face_detector import FaceDetector
 from app.vision.emotion_detector import EmotionDetector
 from app.vision.eye_tracker import EyeTracker
