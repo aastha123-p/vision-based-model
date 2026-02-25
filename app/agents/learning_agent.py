@@ -1,53 +1,118 @@
 """
-Learning Agent for Similarity Search (Phase 3 – Task 2)
-
-This module provides the LearningAgent class that uses embeddings
-and FAISS for storing and retrieving similar medical cases.
-
-Features:
-- Store cases with embeddings for future similarity search
-- Find similar past cases based on current query
-- Return similarity percentages for matched cases
-
-Dependencies:
-- EmbeddingEngine (core/embedding_engine.py)
-- FAISSStore (core/faiss_store.py)
+Learning Agent
+Stores embeddings for continuous learning
 """
 
-import os
-import json
-from typing import Dict, List, Optional, Any
-from datetime import datetime
+from typing import Dict, Optional
+from sqlalchemy.orm import Session
+from app.core.embedding_engine import EmbeddingEngine
+from app.core.faiss_store import FAISSStore
+from app.database.models import Session as SessionModel
+from app.utils.logger import setup_logger
 
-# Import core modules
-import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from core.embedding_engine import EmbeddingEngine
-from core.faiss_store import FAISSStore, create_faiss_store
+logger = setup_logger(__name__)
 
 
 class LearningAgent:
     """
-    Learning Agent for storing and retrieving similar medical cases.
-    
-    This agent uses text embeddings and FAISS vector search to find
-    similar cases based on form data, emotion analysis, and sentiment.
-    
-    Attributes:
-        embedding_engine: Engine for generating text embeddings
-        faiss_store: FAISS vector store for similarity search
-        index_path: Path where FAISS index is stored
+    Stores session embeddings for future reference
     """
-    
-    def __init__(
-        self,
-        embedding_model: str = "all-MiniLM-L6-v2",
-        index_path: str = "data/faiss_index",
-        index_type: str = "Flat",
-        auto_load: bool = True
-    ):
+
+    def __init__(self, db: Session):
         """
-        Initialize the Learning Agent.
+        Initialize learning agent
+        
+        Args:
+            db: Database session
+        """
+        self.db = db
+        self.embedding_engine = EmbeddingEngine()
+        self.faiss_store = FAISSStore()
+
+    def store_session(
+        self, patient_id: int, condition: str, features: Dict
+    ) -> bool:
+        """
+        Store session for learning
+        
+        Args:
+            patient_id: Patient ID
+            condition: Predicted condition
+            features: Session features
+            
+        Returns:
+            True if successful
+        """
+        try:
+            # Create embedding
+            embedding = self.embedding_engine.create_multimodal_embedding(
+                features.get("form", {}),
+                features.get("vision", {}),
+                features.get("speech", {}),
+            )
+
+            if embedding is None:
+                logger.warning("Failed to create embedding for learning")
+                return False
+
+            # Store in FAISS
+            metadata = {
+                "patient_id": patient_id,
+                "condition": condition,
+                "features": {
+                    "symptom_count": len(features.get("form", {}).get("symptoms", [])),
+                    "emotion": features.get("vision", {}).get("emotion"),
+                    "sentiment": features.get("speech", {}).get("sentiment"),
+                },
+            }
+
+            success = self.faiss_store.add_embedding(
+                embedding, metadata, session_id=patient_id
+            )
+
+            if success:
+                # Save FAISS index
+                self.faiss_store.save_index()
+                logger.info(f"Stored session for patient {patient_id}")
+
+            return success
+
+        except Exception as e:
+            logger.error(f"Error storing session: {e}")
+            return False
+
+    def get_similar_sessions(
+        self, features: Dict, top_k: int = 5
+    ) -> list:
+        """
+        Get similar past sessions
+        
+        Args:
+            features: Current session features
+            top_k: Number of results
+            
+        Returns:
+            List of similar sessions
+        """
+        try:
+            # Create embedding for query
+            embedding = self.embedding_engine.create_multimodal_embedding(
+                features.get("form", {}),
+                features.get("vision", {}),
+                features.get("speech", {}),
+            )
+
+            if embedding is None:
+                return []
+
+            # Search FAISS
+            results = self.faiss_store.search_similar(embedding, k=top_k)
+
+            return results
+
+        except Exception as e:
+            logger.error(f"Error retrieving similar sessions: {e}")
+            return []
         
         Args:
             embedding_model: Name of the SentenceTransformer model
