@@ -3,3 +3,13 @@ uvicorn
 sqlalchemy
 pydantic
 python-multipart
+opencv-python
+mediapipe
+transformers
+torch
+torchvision
+numpy
+pillow
+requests
+scipy
+scikit-image
