@@ -1,18 +1,41 @@
-# TODO - Fix three problems in core/embedding_engine.py
+# TODO - Project Tasks
 
-## Problems Identified:
-1. **Line 43 - Missing explicit numpy conversion**: The `.encode()` method needs explicit handling for numpy conversion
-2. **Line 52-53 - Inefficient model loading**: The convenience function creates new model instance every call
-3. **Missing batch processing support**: Need to add batch processing for efficiency
+## Completed Tasks:
 
-## Plan:
+### Phase 3 – Task 2: Similarity Search (FAISS)
+- [x] Add FAISS dependency to requirements.txt
+- [x] Create core/faiss_store.py - FAISSStore class with:
+  - add_embedding() - Add single embedding to index
+  - add_embeddings() - Add multiple embeddings
+  - search() - Search for similar cases
+  - save_index()/load_index() - Persist index to disk
+  - get_similarity_percentage() - Convert distance to similarity %
+- [x] Create app/agents/learning_agent.py - LearningAgent class with:
+  - store_case() - Store case with embeddings
+  - find_similar_cases() - Find similar cases by embedding
+  - get_top_similar_cases() - Convenience method for similarity search
+  - get_stats() - Get agent statistics
+  - save_index()/reload_index() - Index management
+
+### Phase 3 – Task 1: Embedding Generation (Previously completed)
 - [x] Fix 1: Add explicit numpy/tensor handling in generate_embedding method
 - [x] Fix 2: Add singleton pattern or class-level caching for the EmbeddingEngine
 - [x] Fix 3: Add batch processing method for generating multiple embeddings at once
 
-## Summary of Changes:
-1. Added singleton pattern with `__new__` method and `_instances` class variable
-2. Added check in `__init__` to skip re-initialization if already initialized
-3. Modified `generate_embeddings` to use batch processing instead of calling `generate_embedding` for each text
-4. Added `generate_batch_embeddings` method for efficient batch processing of multiple texts
-5. Added explicit numpy/tensor conversion with `hasattr(emb, 'numpy')` check
+## Pending Tasks:
+
+### Phase 4 – Agentic AI Reasoning
+- Phase 4 – Task 1: Condition Prediction (LLM Reasoning)
+  - Create agents/condition_agent.py
+  - Create core/llm_engine.py
+- Phase 4 – Task 2: Medication Suggestion + Safety Layer
+  - Create agents/medication_agent.py
+  - Create agents/safety_agent.py
+  - Create core/safety_rules.py
+
+### Phase 5 – Reporting & Output
+- Phase 5 – Task 1: Dashboard & Visualization
+  - Update frontend/streamlit_app.py
+- Phase 5 – Task 2: PDF & Email Report
+  - Create reports/pdf_generator.py
+  - Create reports/email_service.py
