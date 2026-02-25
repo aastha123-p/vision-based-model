@@ -11,3 +11,14 @@ librosa
 soundfile
 numpy
 python-dotenv
+opencv-python
+mediapipe
+transformers
+torch
+torchvision
+numpy
+pillow
+requests
+scipy
+scikit-image
+sentence-transformers
