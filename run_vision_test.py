@@ -207,7 +207,7 @@ def run_webcam_demo():
         result = analyzer.analyze_frame(frame)
         
         # Draw results
-        output = analyzer.draw_analysis(frame, result)
+        output = analyzer.draw_analysis_results(frame, result)
         
         cv2.imshow('Vision Demo', output)
         
