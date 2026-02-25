@@ -22,3 +22,4 @@ requests
 scipy
 scikit-image
 sentence-transformers
+faiss-cpu
