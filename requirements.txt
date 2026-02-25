@@ -13,3 +13,4 @@ pillow
 requests
 scipy
 scikit-image
+sentence-transformers
