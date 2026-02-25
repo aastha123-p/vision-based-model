@@ -3,3 +3,11 @@ uvicorn
 sqlalchemy
 pydantic
 python-multipart
+openai-whisper
+transformers
+torch
+torchaudio
+librosa
+soundfile
+numpy
+python-dotenv
