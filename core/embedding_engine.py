@@ -25,7 +25,21 @@ class EmbeddingEngine:
     
     Uses pretrained models like all-MiniLM-L6-v2 for efficient
     and high-quality sentence embeddings.
+    
+    Implements singleton pattern to avoid reloading model multiple times.
     """
+    
+    _instances = {}  # Class-level cache for singleton instances
+    
+    def __new__(cls, model_name: str = "all-MiniLM-L6-v2"):
+        """
+        Create or return existing singleton instance for the given model.
+        This avoids reloading the model multiple times.
+        """
+        if model_name not in cls._instances:
+            instance = super().__new__(cls)
+            cls._instances[model_name] = instance
+        return cls._instances[model_name]
     
     def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
         """
@@ -36,6 +50,10 @@ class EmbeddingEngine:
                        Default: all-MiniLM-L6-v2 (fast, 384-dim embeddings)
                        Other options: all-mpnet-base-v2 (higher quality, 768-dim)
         """
+        # Skip re-initialization if already initialized (singleton pattern)
+        if hasattr(self, 'model') and self.model is not None:
+            return
+            
         self.model_name = model_name
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         
@@ -101,16 +119,97 @@ class EmbeddingEngine:
                 'device': str
             }
         """
-        embeddings = {
-            'form_text_embedding': self.generate_embedding(form_text),
-            'emotion_summary_embedding': self.generate_embedding(emotion_summary),
-            'sentiment_summary_embedding': self.generate_embedding(sentiment_summary),
-            'model_name': self.model_name,
-            'embedding_dim': self.embedding_dim,
-            'device': self.device
-        }
+        # Collect all non-empty texts for batch processing
+        texts_to_embed = []
+        keys = ['form_text_embedding', 'emotion_summary_embedding', 'sentiment_summary_embedding']
+        text_values = [form_text, emotion_summary, sentiment_summary]
+        
+        # Filter out None and empty strings
+        valid_texts = []
+        valid_keys = []
+        for key, text in zip(keys, text_values):
+            if text is not None and (not isinstance(text, str) or text.strip() != ""):
+                valid_texts.append(str(text).strip())
+                valid_keys.append(key)
+        
+        # Batch process if we have valid texts
+        batch_embeddings = []
+        if valid_texts:
+            try:
+                # Use batch encoding for efficiency
+                batch_embeddings = self.model.encode(valid_texts, convert_to_numpy=True, show_progress_bar=False)
+            except Exception as e:
+                print(f"Error generating batch embeddings: {e}")
+                batch_embeddings = [None] * len(valid_texts)
+        
+        # Build result dictionary
+        embeddings = {key: None for key in keys}
+        for key, emb in zip(valid_keys, batch_embeddings):
+            if emb is not None:
+                # Ensure numpy array
+                if hasattr(emb, 'numpy'):
+                    emb = emb.numpy()
+                embeddings[key] = emb
+        
+        embeddings['model_name'] = self.model_name
+        embeddings['embedding_dim'] = self.embedding_dim
+        embeddings['device'] = self.device
         
         return embeddings
+    
+    def generate_batch_embeddings(
+        self,
+        texts: List[str],
+        show_progress: bool = False
+    ) -> List[Optional[np.ndarray]]:
+        """
+        Generate embeddings for multiple texts in a single batch.
+        More efficient than calling generate_embedding multiple times.
+        
+        Args:
+            texts: List of text strings
+            show_progress: Whether to show progress bar
+            
+        Returns:
+            List of numpy arrays (one per text), or None for empty/invalid inputs
+        """
+        if not texts:
+            return []
+        
+        # Filter valid texts and track their indices
+        valid_texts = []
+        valid_indices = []
+        for i, text in enumerate(texts):
+            if text is not None and (not isinstance(text, str) or text.strip() != ""):
+                valid_texts.append(str(text).strip())
+                valid_indices.append(i)
+        
+        # Initialize result list with None for all inputs
+        results = [None] * len(texts)
+        
+        if not valid_texts:
+            return results
+        
+        try:
+            # Batch encode all valid texts at once
+            batch_embeddings = self.model.encode(
+                valid_texts, 
+                convert_to_numpy=True,
+                show_progress_bar=show_progress
+            )
+            
+            # Map results back to original indices
+            for idx, emb in zip(valid_indices, batch_embeddings):
+                if emb is not None:
+                    # Ensure numpy array (handle tensor output)
+                    if hasattr(emb, 'numpy'):
+                        emb = emb.numpy()
+                    results[idx] = emb
+                    
+        except Exception as e:
+            print(f"Error generating batch embeddings: {e}")
+        
+        return results
     
     def get_embedding_info(self) -> Dict:
         """
