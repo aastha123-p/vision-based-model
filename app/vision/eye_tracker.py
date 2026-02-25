@@ -342,6 +342,33 @@ class EyeTracker:
         self.blink_count = 0
         self.consecutive_blink_frames = 0
     
+    def update_blink_status(self, ear: float) -> Dict:
+        """
+        Update blink status based on eye aspect ratio
+        
+        Args:
+            ear: Eye aspect ratio value
+            
+        Returns:
+            Dictionary with blink status
+        """
+        is_blink = ear < self.blink_threshold
+        
+        if is_blink:
+            self.consecutive_blink_frames += 1
+        else:
+            if self.consecutive_blink_frames > 0:
+                self.blink_count += 1
+            self.consecutive_blink_frames = 0
+        
+        self.blink_history.append(is_blink)
+        
+        return {
+            'is_blink': is_blink,
+            'blink_count': self.blink_count,
+            'ear': ear
+        }
+    
     def get_statistics(self) -> Dict:
         """
         Get overall eye statistics
