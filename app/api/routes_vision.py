@@ -207,10 +207,10 @@ async def get_session_summary():
                                  if summary['frames_processed'] > 0 else 0,
             dominant_emotion=summary.get('dominant_emotion'),
             total_blinks=summary['total_blinks'],
-            avg_eye_strain=np.mean(summary['session_metrics']['eye_strain_scores']) 
-                          if summary['session_metrics']['eye_strain_scores'] else 0,
-            avg_lip_tension=np.mean(summary['session_metrics']['lip_tensions']) 
-                           if summary['session_metrics']['lip_tensions'] else 0,
+            avg_eye_strain=float(np.mean(summary['session_metrics']['eye_strain_scores'])) 
+                          if summary['session_metrics'].get('eye_strain_scores') and len(summary['session_metrics']['eye_strain_scores']) > 0 else 0.0,
+            avg_lip_tension=float(np.mean(summary['session_metrics']['lip_tensions'])) 
+                           if summary['session_metrics'].get('lip_tensions') and len(summary['session_metrics']['lip_tensions']) > 0 else 0.0,
             overall_strain_level='minimal' if summary.get('eye_strain', {}).get('average', 0) < 20 else 'low'
         )
         
