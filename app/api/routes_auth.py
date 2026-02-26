@@ -10,6 +10,7 @@ import cv2
 import numpy as np
 from io import BytesIO
 import os
+import base64
 
 from app.database.db import get_db
 from app.auth.token_auth import TokenAuthenticator
@@ -98,7 +99,7 @@ async def register_face(patient_id: int, db: Session = Depends(get_db)):
 
 @router.post("/face-login")
 async def face_login(db: Session = Depends(get_db)):
-    """Authenticate patient by face capture"""
+    """Authenticate patient by face capture (webcam)"""
     try:
         face_auth = FaceAuthenticator()
         patient_id, similarity, message = face_auth.authenticate_face(db)
@@ -108,8 +109,14 @@ async def face_login(db: Session = Depends(get_db)):
                 status_code=status.HTTP_401_UNAUTHORIZED, detail=message
             )
 
+        # Get patient name
+        from app.database.models import Patient
+        patient = db.query(Patient).filter(Patient.id == patient_id).first()
+        patient_name = patient.name if patient else "User"
+
         return {
             "patient_id": patient_id,
+            "patient_name": patient_name,
             "similarity_score": similarity,
             "message": message,
             "status": "authenticated",
@@ -119,6 +126,114 @@ async def face_login(db: Session = Depends(get_db)):
         raise
     except Exception as e:
         logger.error(f"Error in face login: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        )
+
+
+@router.post("/face-login-image")
+async def face_login_image(request: FaceLoginRequest, db: Session = Depends(get_db)):
+    """Authenticate patient by face image (from streamlit frontend)"""
+    try:
+        if not request.image_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="No image data provided"
+            )
+
+        # Decode base64 image
+        img_bytes = base64.b64decode(request.image_data)
+        nparr = np.frombuffer(img_bytes, np.uint8)
+        face_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        if face_image is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid image data"
+            )
+
+        # Authenticate with the provided image
+        face_auth = FaceAuthenticator()
+        embedding = face_auth.face_engine.get_embedding(face_image)
+        
+        if embedding is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="No face detected in image"
+            )
+
+        # Find matching patient
+        result = face_auth.embedding_store.find_match(db, embedding, face_auth.similarity_threshold)
+        
+        if result:
+            patient_id, similarity = result
+            from app.database.models import Patient
+            patient = db.query(Patient).filter(Patient.id == patient_id).first()
+            patient_name = patient.name if patient else "User"
+            
+            logger.info(f"Face login successful: patient_id={patient_id}, similarity={similarity:.4f}")
+            
+            return {
+                "patient_id": patient_id,
+                "patient_name": patient_name,
+                "similarity_score": similarity,
+                "message": f"Welcome back, {patient_name}!",
+                "status": "authenticated",
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, 
+                detail="Face not recognized. Please try again or use token login."
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in face login image: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        )
+
+
+@router.post("/face-register-image")
+async def face_register_image(
+    patient_id: int,
+    request: FaceLoginRequest,
+    db: Session = Depends(get_db),
+):
+    """Register patient's face from streamlit frontend"""
+    try:
+        if not request.image_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="No image data provided"
+            )
+
+        # Decode base64 image
+        img_bytes = base64.b64decode(request.image_data)
+        nparr = np.frombuffer(img_bytes, np.uint8)
+        face_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        if face_image is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid image data"
+            )
+
+        # Register face
+        face_auth = FaceAuthenticator()
+        success, message = face_auth.register_face(db, patient_id, face_image)
+
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=message
+            )
+
+        return {
+            "patient_id": patient_id,
+            "message": message,
+            "status": "registered",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error registering face image: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )

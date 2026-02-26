@@ -27,3 +27,5 @@ pypdf
 python-jose
 passlib
 streamlit
+streamlit-webrtc
+av

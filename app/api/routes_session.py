@@ -4,6 +4,8 @@ Handles consultation sessions and analysis
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from app.database.db import get_db
 from app.database.models import Session as SessionModel, Patient
@@ -15,18 +17,28 @@ logger = setup_logger(__name__)
 router = APIRouter(prefix="/api/session", tags=["session"])
 
 
+# Pydantic models for request body
+class SessionStartRequest(BaseModel):
+    patient_id: int
+    chief_complaint: str
+    symptoms: List[str] = Field(..., min_items=1)
+    symptom_duration: str
+    severity: str
+
+
+class SessionAnalyzeRequest(BaseModel):
+    vision_data: Dict[str, Any]
+    speech_data: Dict[str, Any]
+
+
 @router.post("/start")
 async def start_session(
-    patient_id: int,
-    chief_complaint: str,
-    symptoms: list,
-    symptom_duration: str,
-    severity: str,
+    request: SessionStartRequest,
     db: Session = Depends(get_db),
 ):
     """Start analysis session"""
     try:
-        patient = db.query(Patient).filter(Patient.id == patient_id).first()
+        patient = db.query(Patient).filter(Patient.id == request.patient_id).first()
         if not patient:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found"
@@ -34,22 +46,22 @@ async def start_session(
 
         # Create session record
         session = SessionModel(
-            patient_id=patient_id,
-            chief_complaint=chief_complaint,
-            symptoms=symptoms,
-            symptom_duration=symptom_duration,
-            severity=severity,
+            patient_id=request.patient_id,
+            chief_complaint=request.chief_complaint,
+            symptoms=request.symptoms,
+            symptom_duration=request.symptom_duration,
+            severity=request.severity,
         )
 
         db.add(session)
         db.commit()
         db.refresh(session)
 
-        logger.info(f"Started session {session.id} for patient {patient_id}")
+        logger.info(f"Started session {session.id} for patient {request.patient_id}")
 
         return {
             "session_id": session.id,
-            "patient_id": patient_id,
+            "patient_id": request.patient_id,
             "status": "started",
             "message": "Session started. Ready for vision and speech analysis.",
         }
