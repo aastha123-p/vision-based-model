@@ -15,3 +15,6 @@ scipy
 scikit-image
 sentence-transformers
 faiss-cpu
+scikit-learn
+deepface
+openai-whisper
