@@ -3,7 +3,7 @@ Learning Agent
 Stores embeddings for continuous learning
 """
 
-from typing import Dict, Optional
+from typing import Dict, Optional, Any, List
 from sqlalchemy.orm import Session
 from app.core.embedding_engine import EmbeddingEngine
 from app.core.faiss_store import FAISSStore
@@ -113,44 +113,6 @@ class LearningAgent:
         except Exception as e:
             logger.error(f"Error retrieving similar sessions: {e}")
             return []
-        
-        Args:
-            embedding_model: Name of the SentenceTransformer model
-            index_path: Path to store/load FAISS index
-            index_type: Type of FAISS index ('Flat', 'IVF', 'HNSW')
-            auto_load: Whether to load existing index if available
-        """
-        # Initialize embedding engine
-        self.embedding_engine = EmbeddingEngine(model_name=embedding_model)
-        self.embedding_dim = self.embedding_engine.embedding_dim
-        self.index_path = index_path
-        self.index_type = index_type
-        
-        # Initialize FAISS store
-        self.faiss_store = None
-        
-        # Try to load existing index
-        if auto_load and os.path.exists(index_path):
-            try:
-                self.faiss_store = create_faiss_store(
-                    embedding_dim=self.embedding_dim,
-                    index_type=index_type,
-                    load_path=index_path
-                )
-                print(f"Loaded existing FAISS index from {index_path}")
-            except Exception as e:
-                print(f"Could not load existing index: {e}")
-                self.faiss_store = FAISSStore(
-                    embedding_dim=self.embedding_dim,
-                    index_type=index_type
-                )
-        else:
-            self.faiss_store = FAISSStore(
-                embedding_dim=self.embedding_dim,
-                index_type=index_type
-            )
-        
-        print(f"Learning Agent initialized with model: {embedding_model}")
     
     def store_case(
         self,

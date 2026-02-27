@@ -4,6 +4,8 @@ Handles patient registration and form submission
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
+from typing import Optional, List
 from sqlalchemy.orm import Session
 from app.database.db import get_db
 from app.database.models import Patient
@@ -15,19 +17,38 @@ logger = setup_logger(__name__)
 router = APIRouter(prefix="/api/patient", tags=["patient"])
 
 
+# Pydantic models for request body
+class RegisterRequest(BaseModel):
+    name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    age: Optional[int] = None
+    gender: Optional[str] = None
+
+
+class FormSubmissionRequest(BaseModel):
+    patient_id: int
+    chief_complaint: str
+    symptoms: List[str] = Field(..., min_items=1, description="List of symptoms")
+    symptom_duration: str
+    severity: str
+    medical_history: Optional[str] = None
+
+
 @router.post("/register")
 async def register_patient(
-    name: str,
-    email: str = None,
-    phone: str = None,
-    age: int = None,
-    gender: str = None,
+    request: RegisterRequest,
     db: Session = Depends(get_db),
 ):
     """Register new patient"""
     try:
         patient, token = TokenAuthenticator.create_patient(
-            db, name, email, phone, age, gender
+            db, 
+            request.name, 
+            request.email, 
+            request.phone, 
+            request.age, 
+            request.gender
         )
 
         if not patient:
@@ -51,32 +72,27 @@ async def register_patient(
 
 @router.post("/form")
 async def submit_form(
-    patient_id: int,
-    chief_complaint: str,
-    symptoms: list,
-    symptom_duration: str,
-    severity: str,
-    medical_history: str = None,
+    request: FormSubmissionRequest,
     db: Session = Depends(get_db),
 ):
     """Submit pre-consultation form"""
     try:
-        patient = db.query(Patient).filter(Patient.id == patient_id).first()
+        patient = db.query(Patient).filter(Patient.id == request.patient_id).first()
         if not patient:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found"
             )
 
         # Update patient with form data
-        patient.medical_history = medical_history
+        patient.medical_history = request.medical_history
         db.commit()
 
         return {
-            "patient_id": patient_id,
-            "chief_complaint": chief_complaint,
-            "symptoms": symptoms,
-            "symptom_duration": symptom_duration,
-            "severity": severity,
+            "patient_id": request.patient_id,
+            "chief_complaint": request.chief_complaint,
+            "symptoms": request.symptoms,
+            "symptom_duration": request.symptom_duration,
+            "severity": request.severity,
             "message": "Form submitted successfully",
         }
 
